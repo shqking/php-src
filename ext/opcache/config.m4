@@ -29,7 +29,7 @@ if test "$PHP_OPCACHE" != "no"; then
 
   if test "$PHP_OPCACHE_JIT" = "yes"; then
     case $host_cpu in
-      x86*)
+      x86*|aarch64)
         ;;
       *)
         AC_MSG_WARN([JIT not supported by host architecture])
@@ -59,18 +59,37 @@ if test "$PHP_OPCACHE" != "no"; then
       case $host_alias in
         *x86_64-*-darwin*)
           DASM_FLAGS="-D X64APPLE=1 -D X64=1"
+          DASM_ARCH="x86"
         ;;
         *x86_64*)
           DASM_FLAGS="-D X64=1"
+          DASM_ARCH="x86"
+        ;;
+        *aarch64*)
+          DASM_FLAGS="-D ARM64=1"
+          DASM_ARCH="arm64"
         ;;
       esac
+    else
+      DASM_ARCH="x86"
     fi
 
     if test "$PHP_THREAD_SAFETY" = "yes"; then
       DASM_FLAGS="$DASM_FLAGS -D ZTS=1"
     fi
 
+    if test "$DASM_ARCH" = "arm64"; then
+      PKG_CHECK_MODULES([CAPSTONE], [capstone >= 3.0.0],
+                        [have_capstone="yes"], [have_capstone="no"])
+      if test "$have_capstone" = "yes"; then
+        AC_DEFINE(HAVE_CAPSTONE, 1, [ ])
+        PHP_EVAL_LIBLINE($CAPSTONE_LIBS, OPCACHE_SHARED_LIBADD)
+        PHP_EVAL_INCLINE($CAPSTONE_CFLAGS)
+      fi
+    fi
+
     PHP_SUBST(DASM_FLAGS)
+    PHP_SUBST(DASM_ARCH)
 
     AC_MSG_CHECKING(for opagent in default path)
     for i in /usr/local /usr; do
